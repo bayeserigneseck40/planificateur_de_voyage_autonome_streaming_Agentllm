@@ -545,6 +545,20 @@ def _render_email_form():
     st.info(f"💡 {preset['note']}")
 
     # ── Champs du formulaire ────────────────────────────────
+    # Indicateur de configuration depuis .env (sans afficher les valeurs)
+    _env_sender   = os.getenv("SMTP_SENDER_EMAIL", "")
+    _env_password = os.getenv("SMTP_PASSWORD", "")
+    _env_host     = os.getenv("SMTP_HOST", "")
+
+    if _env_sender or _env_password:
+        st.markdown("""
+        <div style="background:#0d2b1a; border:1px solid #2e7d32; border-radius:8px;
+                    padding:0.6rem 1rem; margin-bottom:0.8rem; font-size:0.82rem; color:#81c784;">
+            🔒 Des identifiants SMTP ont été détectés dans votre fichier <code>.env</code>.
+            Ils seront utilisés automatiquement si vous laissez les champs vides ci-dessous.
+        </div>
+        """, unsafe_allow_html=True)
+
     col_a, col_b = st.columns(2)
     with col_a:
         recipient = st.text_input(
@@ -553,20 +567,25 @@ def _render_email_form():
             key="email_recipient"
         )
     with col_b:
-        sender = st.text_input(
-            "📤 Votre email (expéditeur)",
-            value=os.getenv("SMTP_SENDER_EMAIL", ""),
-            placeholder="votre.email@gmail.com",
+        # Champ email expéditeur masqué (type password) — ne jamais afficher la valeur en clair
+        sender_input = st.text_input(
+            "📤 Email expéditeur",
+            type="password",
+            placeholder="🔒 Masqué — laisser vide si défini dans .env",
             key="email_sender_field"
         )
+        # Utiliser la valeur saisie, sinon fallback silencieux sur .env
+        sender = sender_input.strip() if sender_input.strip() else _env_sender
 
-    password = st.text_input(
+    # Champ mot de passe masqué — ne jamais pré-remplir depuis os.getenv dans le widget
+    password_input = st.text_input(
         "🔑 Mot de passe SMTP (ou App Password)",
         type="password",
-        value=os.getenv("SMTP_PASSWORD", ""),
-        placeholder="Votre mot de passe d'application",
+        placeholder="🔒 Masqué — laisser vide si défini dans .env",
         key="email_password"
     )
+    # Utiliser la valeur saisie, sinon fallback silencieux sur .env
+    password = password_input.strip() if password_input.strip() else _env_password
 
     # Champs avancés pour SMTP custom
     if preset_key == "custom":
