@@ -25,12 +25,7 @@ from tools.hotels_tool import search_hotels
 from tools.restaurants_tool import search_restaurants
 from tools.itinerary_tool import build_itinerary
 
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI()
 
 # ─────────────────────────────────────────────
 # Définition des outils disponibles pour l'agent

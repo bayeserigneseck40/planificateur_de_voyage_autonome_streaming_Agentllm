@@ -26,6 +26,7 @@ except ImportError:
 from agent_engine import stream_agent_response, SYSTEM_PROMPT
 from tools.itinerary_tool import get_current_itinerary
 from utils.pdf_exporter import export_itinerary_to_pdf
+from utils.email_sender import send_itinerary_email, SMTP_PRESETS
 
 # ─────────────────────────────────────────────────────────────
 # Configuration de la page Streamlit
@@ -314,6 +315,10 @@ def init_state():
         st.session_state.current_destination = ""
     if "pending_input" not in st.session_state:
         st.session_state.pending_input = None
+    if "show_email_form" not in st.session_state:
+        st.session_state.show_email_form = False
+    if "email_smtp_preset" not in st.session_state:
+        st.session_state.email_smtp_preset = "gmail"
 
 init_state()
 
@@ -504,6 +509,146 @@ with chat_container:
 
 
 # ─────────────────────────────────────────────────────────────
+# Formulaire d'envoi email SMTP
+# ─────────────────────────────────────────────────────────────
+def _render_email_form():
+    """Affiche le formulaire de configuration SMTP et d'envoi d'email."""
+    itinerary = get_current_itinerary()
+    if not itinerary["content"]:
+        st.warning("⚠️ Aucun itinéraire disponible. Générez d'abord un voyage.")
+        return
+
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#0d1b2a,#1a2744);
+                border:1px solid #3949ab; border-radius:14px;
+                padding:1.4rem 1.6rem; margin:1rem 0;">
+        <div style="font-size:1rem; font-weight:700; color:#90caf9; margin-bottom:0.3rem;">
+            📧 Envoyer l'itinéraire par email
+        </div>
+        <div style="font-size:0.82rem; color:#7986cb;">
+            Le PDF sera généré automatiquement et joint à l'email.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Sélection du fournisseur SMTP ────────────────────────────
+    preset_labels = {k: v["label"] for k, v in SMTP_PRESETS.items()}
+    preset_key = st.selectbox(
+        "🌐 Fournisseur de messagerie",
+        options=list(preset_labels.keys()),
+        format_func=lambda k: preset_labels[k],
+        key="smtp_preset_select"
+    )
+    preset = SMTP_PRESETS[preset_key]
+
+    # Note d'aide spécifique au fournisseur
+    st.info(f"💡 {preset['note']}")
+
+    # ── Champs du formulaire ────────────────────────────────
+    col_a, col_b = st.columns(2)
+    with col_a:
+        recipient = st.text_input(
+            "📨 Email destinataire",
+            placeholder="exemple@gmail.com",
+            key="email_recipient"
+        )
+    with col_b:
+        sender = st.text_input(
+            "📤 Votre email (expéditeur)",
+            value=os.getenv("SMTP_SENDER_EMAIL", ""),
+            placeholder="votre.email@gmail.com",
+            key="email_sender_field"
+        )
+
+    password = st.text_input(
+        "🔑 Mot de passe SMTP (ou App Password)",
+        type="password",
+        value=os.getenv("SMTP_PASSWORD", ""),
+        placeholder="Votre mot de passe d'application",
+        key="email_password"
+    )
+
+    # Champs avancés pour SMTP custom
+    if preset_key == "custom":
+        col_c, col_d = st.columns(2)
+        with col_c:
+            custom_host = st.text_input(
+                "🌐 Serveur SMTP (host)",
+                placeholder="smtp.monserveur.com",
+                key="smtp_custom_host"
+            )
+        with col_d:
+            custom_port = st.number_input(
+                "🔌 Port SMTP",
+                value=587, min_value=1, max_value=65535,
+                key="smtp_custom_port"
+            )
+        smtp_host = custom_host
+        smtp_port = int(custom_port)
+    else:
+        smtp_host = preset["host"]
+        smtp_port = preset["port"]
+
+    # ── Bouton d'envoi ─────────────────────────────────────
+    col_send, col_cancel = st.columns([2, 1])
+    with col_send:
+        send_clicked = st.button(
+            "🚀 Envoyer l'itinéraire maintenant",
+            type="primary", use_container_width=True,
+            key="send_email_confirm"
+        )
+    with col_cancel:
+        if st.button("❌ Annuler", use_container_width=True, key="cancel_email"):
+            st.session_state.show_email_form = False
+            st.rerun()
+
+    if send_clicked:
+        # Validation rapide
+        if not recipient or "@" not in recipient:
+            st.error("❌ Veuillez saisir une adresse email destinataire valide.")
+            return
+        if not sender or "@" not in sender:
+            st.error("❌ Veuillez saisir votre adresse email expéditeur.")
+            return
+        if not password:
+            st.error("❌ Veuillez saisir votre mot de passe SMTP.")
+            return
+
+        with st.spinner("📤 Génération du PDF et envoi en cours..."):
+            # 1. Générer le PDF
+            pdf_path = None
+            try:
+                pdf_path = export_itinerary_to_pdf(
+                    content=itinerary["content"],
+                    destination=itinerary["destination"],
+                    month=itinerary["month"]
+                )
+            except Exception as pdf_err:
+                st.warning(f"⚠️ PDF non généré ({pdf_err}), l'email sera envoyé sans pièce jointe.")
+
+            # 2. Envoyer l'email
+            result = send_itinerary_email(
+                recipient_email=recipient,
+                destination=itinerary["destination"],
+                month=itinerary["month"],
+                itinerary_text=itinerary["content"],
+                pdf_path=pdf_path,
+                sender_email=sender,
+                sender_password=password,
+                smtp_host=smtp_host,
+                smtp_port=smtp_port,
+                use_tls=preset.get("use_tls", True)
+            )
+
+        if result["success"]:
+            st.success(f"✅ {result['message']}")
+            st.balloons()
+            st.session_state.show_email_form = False
+        else:
+            st.error(f"❌ {result['message']}")
+
+
+# ─────────────────────────────────────────────────────────────
 # Section Export (si itinéraire disponible)
 # ─────────────────────────────────────────────────────────────
 if st.session_state.itinerary_ready:
@@ -518,7 +663,7 @@ if st.session_state.itinerary_ready:
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
-        if st.button("📄 Télécharger en PDF", type="primary", use_container_width=True):
+        if st.button("📄 Télécharger en PDF", type="primary", use_container_width=True, key="dl_pdf_top"):
             itinerary = get_current_itinerary()
             if itinerary["content"]:
                 with st.spinner("Génération du PDF..."):
@@ -536,20 +681,25 @@ if st.session_state.itinerary_ready:
                             data=pdf_bytes,
                             file_name=f"itineraire_{dest_clean}_{itinerary['month']}.pdf",
                             mime="application/pdf",
-                            use_container_width=True
+                            use_container_width=True,
+                            key="dl_pdf_top_btn"
                         )
                         st.success("✅ PDF généré avec succès !")
                     except Exception as e:
                         st.error(f"Erreur PDF : {str(e)}")
 
     with col2:
-        if st.button("📧 Envoyer par Email", use_container_width=True):
-            st.session_state.pending_input = "Envoie-moi l'itinéraire par email. Demande-moi mon adresse email."
+        if st.button("📧 Envoyer par Email", use_container_width=True, key="email_btn_top"):
+            st.session_state.show_email_form = not st.session_state.show_email_form
             st.rerun()
 
     with col3:
-        if st.button("✏️ Modifier l'itinéraire", use_container_width=True):
+        if st.button("✏️ Modifier l'itinéraire", use_container_width=True, key="modify_btn_top"):
             st.info("💬 Utilisez le chat ci-dessous pour modifier votre itinéraire !")
+
+    # ── Formulaire d'envoi email (affiché/masqué par toggle) ──────
+    if st.session_state.show_email_form:
+        _render_email_form()
 
 
 # ─────────────────────────────────────────────────────────────

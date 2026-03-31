@@ -62,6 +62,46 @@ L'utilisation conjointe des techniques Chain-of-Thought et ReAct est fondamental
 
 ---
 
+## 5. Envoi d'Email avec SMTP
+
+L'agent intègre un module d'envoi d'email natif (`utils/email_sender.py`) reposant exclusivement sur la bibliothèque standard Python (`smtplib`, `email`), sans dépendance externe supplémentaire. Il supporte les fournisseurs Gmail, Outlook, Yahoo et tout serveur SMTP personnalisé.
+
+### Fonctionnement
+
+Lorsque l'utilisateur clique sur **"Envoyer par Email"** dans l'interface Streamlit, un formulaire s'affiche permettant de :
+
+1. Sélectionner son fournisseur de messagerie (Gmail, Outlook, Yahoo, ou SMTP custom)
+2. Saisir l'adresse destinataire et les identifiants SMTP
+3. Déclencher l'envoi en un clic
+
+L'agent génère automatiquement le PDF de l'itinéraire, puis envoie un email avec un **corps HTML élégant** (aperçu de l'itinéraire, mise en page responsive) et le **PDF en pièce jointe**.
+
+### Configuration Gmail (recommandée)
+
+Gmail exige l'utilisation d'un **Mot de passe d'application** (App Password) et non votre mot de passe principal, pour des raisons de sécurité. Pour en générer un :
+
+1. Activez la validation en deux étapes sur votre compte Google
+2. Rendez-vous sur [https://myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+3. Créez un mot de passe pour "Autre application" et copiez-le dans le champ SMTP
+
+Ces identifiants peuvent également être pré-remplis dans le fichier `.env` pour éviter de les ressaisir à chaque session :
+
+```env
+SMTP_SENDER_EMAIL=votre.email@gmail.com
+SMTP_PASSWORD=xxxx xxxx xxxx xxxx
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+```
+
+| Fournisseur | Serveur SMTP | Port | Authentification |
+|-------------|-------------|------|------------------|
+| Gmail | smtp.gmail.com | 587 | App Password |
+| Outlook / Hotmail | smtp-mail.outlook.com | 587 | Mot de passe habituel |
+| Yahoo Mail | smtp.mail.yahoo.com | 587 | App Password |
+| Custom | Votre serveur | 587 | Selon config |
+
+---
+
 ## Références
 
 [1] Wei, J., Wang, X., Schuurmans, D., Bosma, M., Ichter, B., Xia, F., Chi, E., Le, Q., & Zhou, D. (2022). Chain-of-Thought Prompting Elicits Reasoning in Large Language Models. *arXiv preprint arXiv:2201.11903*.
