@@ -1,16 +1,3 @@
-"""
-Utilitaire d'export PDF de l'itinéraire de voyage.
-Utilise fpdf2 pour générer un PDF propre et structuré.
-
-Corrections appliquées :
-- Marges explicites déclarées dans __init__ (L=10, R=10, T=10)
-- Suppression du cell(5,6,'') qui décalait le curseur X avant multi_cell
-- Calcul de col_width basé sur la largeur utile réelle (w - lmargin - rmargin)
-- Remplacement de set_xy fixe après la page de titre par ln() dynamique
-- Ajout de get_string_width() pour tronquer les cellules de tableau de façon sûre
-- Encodage unicode robuste via unicodedata.normalize avant latin-1
-"""
-
 import os
 import re
 import tempfile

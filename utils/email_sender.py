@@ -1,12 +1,3 @@
-"""
-Module d'envoi d'email avec SMTP.
-Supporte Gmail (TLS port 587), Outlook/Hotmail, et tout serveur SMTP custom.
-Envoie l'itinéraire en corps HTML + pièce jointe PDF.
-
-Compatibilité : Windows / Linux / macOS
-Dépendances : uniquement la bibliothèque standard Python (smtplib, email)
-"""
-
 import os
 import smtplib
 import ssl
