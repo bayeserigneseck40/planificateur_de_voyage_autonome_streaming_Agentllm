@@ -10,14 +10,9 @@ import time
 from pathlib import Path
 from openai import OpenAI
 
-# Charger le fichier .env si présent (compatible Windows/Linux/macOS)
-try:
-    from dotenv import load_dotenv
-    _env_path = Path(os.path.dirname(os.path.abspath(__file__))) / ".env"
-    if _env_path.exists():
-        load_dotenv(dotenv_path=_env_path)
-except ImportError:
-    pass
+from dotenv import load_dotenv
+load_dotenv()
+
 
 from tools.weather_tool import get_weather_info
 from tools.flights_tool import search_flights
